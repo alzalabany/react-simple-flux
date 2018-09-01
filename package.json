@@ -1,0 +1,33 @@
+{
+  "name": "react-simple-flux",
+  "version": "1.0.0",
+  "description": "",
+  "main": "build/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "webpack --watch",
+    "build": "webpack",
+    "deploy": "rm -rf ./build && npm run build && npm run publish"
+  },
+  "author": "Momen Zalabany",
+  "license": "MIT",
+  "peerDependencies": {
+    "prop-types": "^15.6.2",
+    "react": "^16.4.0",
+    "react-dom": "^16.4.0"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.4",
+    "babel-plugin-transform-class-properties": "^6.24.1",
+    "babel-plugin-transform-object-rest-spread": "^6.26.0",
+    "babel-plugin-transform-react-jsx": "^6.24.1",
+    "babel-preset-env": "^1.7.0",
+    "babel-runtime": "^6.26.0",
+    "react": "^16.4.0",
+    "react-dom": "^16.4.0",
+    "webpack": "^4.17.1",
+    "webpack-cli": "^3.1.0"
+  }
+}
