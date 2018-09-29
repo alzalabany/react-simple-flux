@@ -16,7 +16,7 @@ class ReactSimpleFlux extends React.Component {
     this.emitter = {};
 
     // adding actions
-    props.actions.map(this._addAction);
+    props.actions.map(fn=>subscribe(fn.eventName, fn, this.emitter));
 
     this.reducer = props.reducer;
 
@@ -24,44 +24,43 @@ class ReactSimpleFlux extends React.Component {
       type: "/simpleflux/@@init/"
     });
   }
-  _addAction = fn => {
-    if (Array.isArray(fn.eventName)) {
-      fn.eventName.forEach(name => {
-        subscribe(name, fn, this.emitter);
-      });
-    } else {
-      subscribe(fn.eventName, fn, this.emitter);
-    }
-  };
+
+  /**
+   * return current AppState
+   * @todo return a copy of state not actual, to prevent mutation.
+   */
+  getState = () => this.state;
 
   /**
    * emit action to be utelized by actionCreator or by UI
    */
   emit = (event, data) => {
-    return new Promise(resolve => {
-      // debug("should emit event", this);
-      if (!this.emitter[event])
-        return resolve({ ok: false, reason: "NO_LISTENERS" }); // no events listening !
-      // debug(event, data);
-      const promises = this.emitter[event].map(async fn => await fn(event, data, this.emit, () => this.state) );
 
-      Promise.all(promises)
+      let actionCreators = [];
+
+      if( Array.isArray(this.emitter['*']) ){
+        actionCreators = this.emitter['*'];
+      }
+
+      if(Array.isArray(this.emitter[event])){
+        actionCreators = actionCreators.concat(this.emitter[event]);
+      }
+
+      let promises = actionCreators.map(async fn => await fn(event, data, this.emit, this.getState) );
+
+      return Promise.all(promises)
            .then(result=>result.filter(r=>r && typeof r.type==='string'))
-           .then(actions=>actions.map(action=>this.reducer(this.state, action))
-                                 .filter(newState=>newState !== this.state)
-           )
-           .then(newStates=>{
-            if(newStates.length === 0)return null; // no changes happened
-            return newStates.reduce((carry,item)=>Object.assign(carry,item),{...this.state})
-           })
+           .then(actions=>actions.reduce((state, action)=>this.reducer(state, action),this.state)
            .then(newState=>{
-            if(!newState)
-              return ;//debug('no changes');
-
-            this.setState(newState);
-            // lets setState :-)
+            if(newState && newState !== this.state){
+              this.setState(newState);
+            }
+            return newState;
            })
-    });
+           .catch(e=>{
+            console.error('something bad happened while executing event:'+event, data);
+            console.info(promises);
+           })
   };
 
   /**

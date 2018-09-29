@@ -2,7 +2,9 @@ export function subscribe(name, fn, eventStore) {
   if (Array.isArray(name)) return name.map(n => subscribe(n, fn, eventStore));
 
   if (!eventStore[name]) eventStore[name] = [];
+  if (!eventStore['*']) eventStore['*'] = [];
   eventStore[name].push(fn);
+  eventStore['*'].push(fn);
   const idx = eventStore[name].length - 1;
   return () => eventStore[name].splice(idx, 1); // unsubscribe
 }
