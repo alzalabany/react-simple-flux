@@ -11,12 +11,18 @@ module.exports = {
       {
         test: /\.js$/,
         include: path.resolve(__dirname, 'src'),
-        exclude: /(node_modules|bower_components|build)/,
+        exclude: /(node_modules|build)/,
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['env'],
-            plugins: ["transform-class-properties"]
+            presets: ['env',"react"],
+            plugins: [
+    "transform-object-rest-spread",
+    "transform-react-jsx",
+    "transform-class-properties",
+    "transform-runtime",
+    "transform-async-to-generator"
+  ]
           }
         }
       }

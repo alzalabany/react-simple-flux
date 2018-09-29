@@ -6,29 +6,65 @@ export function subscribe(name, fn, eventStore) {
   const idx = eventStore[name].length - 1;
   return () => eventStore[name].splice(idx, 1); // unsubscribe
 }
-export function combineReducers(reducers) {
+export function combineReducers(reducers, debug) {
   const reducerKeys = Object.keys(reducers);
-
-  return function combination(state = {}, action) {
+  const emptyState = {};
+  return function combination(state = emptyState, action) {
     let hasChanged = false;
     const nextState = {};
+    if (!action || typeof action.type !== "string") {
+      console.error(
+        "All actions must contain a type attribute, eg: { type: String, ... }, we will ignore your action",
+        action,
+        state
+      );
+      return state;
+    }
     reducerKeys.forEach(key => {
-      const reducer = reducers[key];
-      const scope = reducer.eventName;
-      const previousStateForKey = state[key];
       let nextStateForKey;
-      if (scope && scope.indexOf(action.type) === -1) {
-        nextStateForKey = previousStateForKey || reducer.initalState;
+      const reducer = reducers[key];
+      const previousStateForKey = state[key];
+      const initalState = reducer.initalState || null;
+      const scope = reducer.eventName;
+
+      if (
+        scope &&
+        (scope !== action.type || scope.indexOf(action.type) === -1)
+      ) {
+        nextStateForKey = previousStateForKey || initalState;
       } else {
         nextStateForKey = reducer(previousStateForKey, action, state);
       }
-
       if (typeof nextStateForKey === "undefined") {
-        console.error("reducer returned undefined", key, scope, action);
+        console.error(
+          "reducer named " +
+            key +
+            " returned undefined, you must return something !, we will just ignore your action for this key..."
+        );
+        nextStateForKey = previousStateForKey;
       }
       nextState[key] = nextStateForKey;
+      if (debug) {
+        if (nextStateForKey === previousStateForKey) {
+          console.log(
+            "Action of type " + action.type + " didNOT change your key:" + key,
+            nextStateForKey
+          );
+        } else {
+          console.log(
+            "Action of type " + action.type + " changed your key:" + key
+          );
+          console.log("from", previousStateForKey);
+          console.log("to", nextStateForKey);
+        }
+      }
       hasChanged = hasChanged || nextStateForKey !== previousStateForKey;
     });
+    if (debug && hasChanged) {
+      console.log("your state will change");
+      console.log("from", state);
+      console.log("to", nextState);
+    }
     return hasChanged ? nextState : state;
   };
 }
