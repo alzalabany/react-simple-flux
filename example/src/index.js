@@ -25,15 +25,32 @@ const rootReducer = combineReducers({
 function sample(event, data, emit, getState){
   emit('addStart');
   // do async stuff
-  setTimeout(function() { emit('addEnd'); }, 1000);
-  return {
-    type: 'add',
-    payload: data,
-  }
+  const data = await new Promise(resolve=>{
+    setTimeout(function() {
+      emit('addEnd');
+      resolve({
+        type: 'add',
+        payload: data,
+      });
+    }, 1000);
+  })
+
+  return data; // this will go to reducer
 }
 sample.eventName = ['add', 'subtract'];
 
-ReactDOM.render(<SimpleFlux reducer={rootReducer} actions={[console.warn, sample]}>
+function loggerExample(event, data){
+  console.log('you emitteed an event named:'+event, data);
+
+  // call api to store this event !!;
+  // api.post('/log',{event, data});
+
+
+  return null; // return null to avoid calling reducer or updating state;
+}
+sample.eventName = '*' // listen to all events :)
+
+ReactDOM.render(<SimpleFlux reducer={rootReducer} actions={[loggerExample, sample]}>
                   <App />
                 </SimpleFlux>, document.getElementById('root'));
 registerServiceWorker();

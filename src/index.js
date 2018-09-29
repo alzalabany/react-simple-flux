@@ -16,7 +16,7 @@ class ReactSimpleFlux extends React.Component {
     this.emitter = {};
 
     // adding actions
-    props.actions.map(fn=>subscribe(fn.eventName, fn, this.emitter));
+    props.actions.map(fn=>subscribe(fn.eventName||'*', fn, this.emitter));
 
     this.reducer = props.reducer;
 
