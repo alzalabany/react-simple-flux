@@ -20,6 +20,122 @@ receive an action and return a new version of App State
 
 someone who responde to user actions by emitting an event !.
 
+#### Example Usage
+
+
+### example Login Component
+
+login.js
+```jsx
+  class LoginContainer extends React.PureComponent{
+
+    componentDidMount(){
+      this.listeners = [
+        this.props.listen("LOGIN_START", ()=>this.setState({loading:true})),
+        this.props.listen("LOGIN_END", ()=>this.setState({loading:false})),
+        this.props.listen("LOGIN_FAILED", (eventName, error)=>this.setState({error})),
+      ];
+    }
+
+    componentWillUnMount(){
+      this.listeners.map(un=>un());
+    }
+
+    attemptLogin = (username, password) => {
+      this.props.emit("ATTEMPT_LOGIN", {username, password})
+    }
+
+    render(){
+      return <div>
+
+          {this.state.loading && <Spinner> Please wait ... </Spinner>}
+
+          {this.state.error && <Error> {this.state.error.reason} </Error>}
+
+          <LoginForm
+            onSubmit={this.attemptLogin}
+            disabled={this.state.loading}
+          />
+
+      </div>
+    }
+
+  }
+
+  LoginContainer.stateToProps = (store, selectors) => ({
+    currentUser: selectors.auth.getCurrentUser(store),
+  })
+
+  export default withCore(LoginContainer);
+```
+
+above you will notice few things.
+
+- using listen and emit, makes the UI very clean !
+- this.props.listen return a function that unsubscribe listerner, so we call this function on *unmount* to clear all subscriptions.
+- we will not do any validation in UI, its the SDK job to do it and emit `LOGIN_FAILED` if it fail, this allow for maximum code sharing between project.
+- **RULE OF THUMB:** if its not Enviroment dependent code, try to move it to SDK package.
+
+example SDK code
+
+```jsx
+  // selectors.js
+  export const getCurrentUser =  store => store[types.mountKey] || reducer.initialState;
+
+  // reducer.js
+  export function reducer(state=reducer.initalState;, action){
+    if(action.type === 'LOGIN_SUCCESS'){
+      return action.data;
+    }
+    return state
+  }
+  reducer.initalState = {};
+  reducer.eventName = ['LOGIN_SUCCESS']; // only get called if action.type === 'LOGINSUCCESS'
+
+
+  // action.js
+  async function loginActionCreator(event, data, emit){
+
+    // if(event !== 'LOGIN_ATTEMPT')return; // we dont need this, because we used eventName bellow.
+
+    // step 1: validate Data;
+    // -----------------------
+
+    if( !data.username )
+      return emit('LOGIN_FAILED',{message:'username is required'});
+    if( !data.password )
+      return emit('LOGIN_FAILED',{message:'password is required'});
+
+    // step 2: trying to login
+    // -----------------------
+
+    emit('LOGIN_START');
+    let user;
+    try{
+      user = await api.post('/login', data);
+    }catch(e){
+      emit('LOGIN_FAILED',{message:'username or password doesnot match'});
+    }
+    emit('LOGIN_END');
+
+    if(user && user.data.token){
+      // login success, and data has my token
+
+      //step 3: return action to reducer to change appState
+      // --------------------------------------------------
+      return {
+        type: 'LOGIN_SUCCESS',
+        data: user.data,
+      }
+    }
+  }
+  loginActionCreator.eventName = 'LOGIN_ATTEMPT'; // only responde to 'LOGIN_ATTEMPT'
+```
+
+Thats It, now you have your smart actionCreator inside your ./sdk folder contain all business logic, and you have kept your ui logic clean and as minimal as possible.
+
+this allow you to share ./sdk folder with your mobile/web/other project easily, you can pack it into its own npm package and simply npm install it. **MAXIMUM code share :)**
+
 ## So how it works ?
 
 we give Action creators and connected components some super powers. so Typical life cycle is as so.
@@ -160,9 +276,17 @@ export default [loadAction];
 selectors.js
 
 ```jsx
+  import * as types from './types';
+  import reducer from './reducer';
+
+  export const getTodos = store => store[types.mountKey] || reducer.initialState;
 ```
+
+
 
 ## Todo
 
-- consider moving logic to its own worker.
 - improve HOC function, may be implementing `shouldComponentUpdate` if its proved to be worth it.
+- consider moving logic to its own worker.
+- consider enabling remote Event sourcing keep state tree on remote host !.
+

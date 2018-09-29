@@ -10,7 +10,7 @@
     "deploy": "rm -rf ./build && npm run build && npm publish"
   },
   "author": "Momen Zalabany",
-  "repository": "http://github.com/alzalabany/react-simple-flux",
+  "repository": "https://github.com/alzalabany/react-simple-flux",
   "license": "MIT",
   "peerDependencies": {
     "prop-types": "^15.6.2",
