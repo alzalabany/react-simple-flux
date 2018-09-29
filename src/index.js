@@ -23,6 +23,11 @@ class ReactSimpleFlux extends React.Component {
     this.state = this.reducer(props.initialState || {}, {
       type: "/simpleflux/@@init/"
     });
+
+    if(props.debug){
+      console.log('simpleflux/@@init with '+Object.keys(this.emitter).join(',')+' events');
+      console.log('initalState will be =', this.state);
+    }
   }
 
   /**
@@ -46,6 +51,12 @@ class ReactSimpleFlux extends React.Component {
         actionCreators = actionCreators.concat(this.emitter[event]);
       }
 
+      if(this.props.debug){
+        console.log('will emit event: '+event);
+        console.log('with data:', data);
+        console.log('to actionCreators:', actionCreators);
+      }
+
       let promises = actionCreators.map(async fn => await fn(event, data, this.emit, this.getState) );
 
       return Promise.all(promises)
@@ -53,7 +64,13 @@ class ReactSimpleFlux extends React.Component {
            .then(actions=>actions.reduce((state, action)=>this.reducer(state, action),this.state))
            .then(newState=>{
             if(newState && newState !== this.state){
+              if(this.props.debug){
+                console.log('emit event: '+event+' resulted in new state', newState);
+              }
               this.setState(newState);
+            }
+            if(this.props.debug){
+              console.log('finished working event: '+event, newState);
             }
             return newState;
            })
@@ -72,8 +89,12 @@ class ReactSimpleFlux extends React.Component {
 
   componentDidUpdate() {
     // A hook for persisting to storage or whatever
+    // @@todo: explore option to remove this and added it as callback to setState to avoid calling this on initalMount !
     // --------------------------------------------
     this.props.onChange && this.props.onChange(this.state, this.stack);
+    if(this.props.debug){
+      console.log('@@simpleflux: will call onChange because component Did Update !');
+    }
   }
 
   render() {
@@ -84,7 +105,7 @@ class ReactSimpleFlux extends React.Component {
           store: this.state,
           emit,
           listen,
-          selectors: this.props.selectors
+          selectors: this.props.selectors // just a proxy to avoid import X form '../../../sdk/MODULE/selectors' shit..
         }}
       >
         {this.props.children}
@@ -95,6 +116,7 @@ class ReactSimpleFlux extends React.Component {
 
 ReactSimpleFlux.displayName = "Core";
 ReactSimpleFlux.propTypes = {
+  debug: t.boolean,
   reducer: t.func.isRequired,
   actions: t.arrayOf(t.func).isRequired,
   onChange: t.func,

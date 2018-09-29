@@ -16,11 +16,16 @@ function countReducer(state=countReducer.initialState, action){
   return state;
 }
 countReducer.initialState = {count:0};
+// countReducer.eventName = ['add', 'subtract']; // commented-out cause we don't need it ! we have an if condition in place :-).
 
+/**
+ * create root reducer, here we show how nested reducers can all react to single actionCreator
+ */
 const rootReducer = combineReducers({
   slice1: countReducer,
   nested: combineReducers({countReducer, countReducer2:countReducer})
 });
+
 
 function sample(event, data, emit, getState){
   emit('addStart');
@@ -39,18 +44,32 @@ function sample(event, data, emit, getState){
 }
 sample.eventName = ['add', 'subtract'];
 
+
+/**
+ * Log all actions emitted by your app and save them to remote api !
+ */
 function loggerExample(event, data){
-  console.log('you emitteed an event named:'+event, data);
+  console.log('you emitted an event named:'+event, data);
 
   // call api to store this event !!;
   // api.post('/log',{event, data});
-
 
   return null; // return null to avoid calling reducer or updating state;
 }
 sample.eventName = '*' // listen to all events :)
 
-ReactDOM.render(<SimpleFlux reducer={rootReducer} actions={[loggerExample, sample]}>
+
+/**
+ * save state to browser localStorage
+ */
+const saveToDisk = state => localStorage.setItem("myApp", JSON.stringify(state));
+
+/**
+ * load state from browser localStorage
+ */
+const initialState = JSON.parse( localStorage.setItem("myApp") || "{}" );
+
+ReactDOM.render(<SimpleFlux initialState={initalState} onChange={saveToDisk} reducer={rootReducer} actions={[loggerExample, sample]}>
                   <App />
                 </SimpleFlux>, document.getElementById('root'));
 registerServiceWorker();

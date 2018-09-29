@@ -38,13 +38,14 @@ export function combineReducers(reducers, debug) {
       const scope = reducer.eventName;
 
       if (
-        scope &&
+        scope && action.type !== "/simpleflux/@@init/" &&
         (scope !== action.type || scope.indexOf(action.type) === -1)
       ) {
         nextStateForKey = previousStateForKey || initalState;
       } else {
         nextStateForKey = reducer(previousStateForKey, action, state);
       }
+
       if (typeof nextStateForKey === "undefined") {
         console.error(
           "reducer named " +
@@ -53,7 +54,9 @@ export function combineReducers(reducers, debug) {
         );
         nextStateForKey = previousStateForKey;
       }
+
       nextState[key] = nextStateForKey;
+
       if (debug) {
         if (nextStateForKey === previousStateForKey) {
           console.log(
