@@ -49,8 +49,8 @@ class ReactSimpleFlux extends React.Component {
       let promises = actionCreators.map(async fn => await fn(event, data, this.emit, this.getState) );
 
       return Promise.all(promises)
-           .then(result=>result.filter(r=>r && typeof r.type==='string'))
-           .then(actions=>actions.reduce((state, action)=>this.reducer(state, action),this.state)
+           .then(result=>result.filter(r=>r && typeof r.type==='string') )
+           .then(actions=>actions.reduce((state, action)=>this.reducer(state, action),this.state))
            .then(newState=>{
             if(newState && newState !== this.state){
               this.setState(newState);
