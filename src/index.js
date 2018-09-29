@@ -2,14 +2,15 @@ import * as React from "react";
 import t from "prop-types";
 import { subscribe, combineReducers } from "./utils";
 
-const debug = console.log;
+const noob = ()=>null;
 const Context = React.createContext({
-  listen: console.log,
-  emit: console.warn,
+  listen: noob,
+  emit: noob,
   store: {}
 });
 
 class ReactSimpleFlux extends React.Component {
+
   constructor(props) {
     super(props);
     this.emitter = {};
@@ -32,24 +33,34 @@ class ReactSimpleFlux extends React.Component {
       subscribe(fn.eventName, fn, this.emitter);
     }
   };
+
   /**
    * emit action to be utelized by actionCreator or by UI
    */
   emit = (event, data) => {
     return new Promise(resolve => {
-      debug("should emit event", this);
+      // debug("should emit event", this);
       if (!this.emitter[event])
         return resolve({ ok: false, reason: "NO_LISTENERS" }); // no events listening !
-      debug(event, data);
-      this.emitter[event].map(async fn => {
-        const action = await fn(event, data, this.emit, () => this.state);
-        if (action && action.type) {
-          // call reducer
-          const newStore = this.reducer(this.state, action);
-          this.setState(newStore);
-          // @@BUG.. should setState once at end..
-        }
-      });
+      // debug(event, data);
+      const promises = this.emitter[event].map(async fn => await fn(event, data, this.emit, () => this.state) );
+
+      Promise.all(promises)
+           .then(result=>result.filter(r=>r && typeof r.type==='string'))
+           .then(actions=>actions.map(action=>this.reducer(this.state, action))
+                                 .filter(newState=>newState !== this.state)
+           )
+           .then(newStates=>{
+            if(newStates.length === 0)return null; // no changes happened
+            return newStates.reduce((carry,item)=>Object.assign(carry,item),{...this.state})
+           })
+           .then(newState=>{
+            if(!newState)
+              return ;//debug('no changes');
+
+            this.setState(newState);
+            // lets setState :-)
+           })
     });
   };
 
@@ -88,12 +99,7 @@ ReactSimpleFlux.propTypes = {
   reducer: t.func.isRequired,
   actions: t.arrayOf(t.func).isRequired,
   onChange: t.func,
-  initalValue: t.any
-};
-ReactSimpleFlux.defaultProps = {
-  reducer: console.log,
-  actions: [],
-  onChange: console.info
+  initalState: t.any
 };
 
 const Connect = Context.Consumer;
