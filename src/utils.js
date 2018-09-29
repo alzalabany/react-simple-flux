@@ -3,10 +3,18 @@ export function subscribe(name, fn, eventStore) {
 
   if (!eventStore[name]) eventStore[name] = [];
   if (!eventStore['*']) eventStore['*'] = [];
+
+  // mutate eventStore
   eventStore[name].push(fn);
   eventStore['*'].push(fn);
+
+  // return unsubscribe fn;
   const idx = eventStore[name].length - 1;
-  return () => eventStore[name].splice(idx, 1); // unsubscribe
+  const idx2 = eventStore['*'].length - 1;
+  return () => {
+    eventStore[name].splice(idx, 1);
+    eventStore['*'].splice(idx2, 1);
+  }
 }
 export function combineReducers(reducers, debug) {
   const reducerKeys = Object.keys(reducers);
