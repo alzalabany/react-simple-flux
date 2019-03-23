@@ -22,57 +22,54 @@ someone who responde to user actions by emitting an event !.
 
 #### Example Usage
 
-
 ### example Login Component
 
 login.js
+
 ```jsx
-  class LoginContainer extends React.PureComponent{
-
-    componentDidMount(){
-      this.listeners = [
-        this.props.listen("LOGIN_START", ()=>this.setState({loading:true})),
-        this.props.listen("LOGIN_END", ()=>this.setState({loading:false})),
-        this.props.listen("LOGIN_FAILED", (eventName, error)=>this.setState({error})),
-      ];
-    }
-
-    componentWillUnMount(){
-      this.listeners.map(un=>un());
-    }
-
-    attemptLogin = (username, password) => {
-      this.props.emit("ATTEMPT_LOGIN", {username, password})
-    }
-
-    render(){
-      return <div>
-
-          {this.state.loading && <Spinner> Please wait ... </Spinner>}
-
-          {this.state.error && <Error> {this.state.error.reason} </Error>}
-
-          <LoginForm
-            onSubmit={this.attemptLogin}
-            disabled={this.state.loading}
-          />
-
-      </div>
-    }
-
+class LoginContainer extends React.PureComponent {
+  componentDidMount() {
+    this.listeners = [
+      this.props.listen("LOGIN_START", () => this.setState({ loading: true })),
+      this.props.listen("LOGIN_END", () => this.setState({ loading: false })),
+      this.props.listen("LOGIN_FAILED", (eventName, error) =>
+        this.setState({ error })
+      )
+    ];
   }
 
-  LoginContainer.stateToProps = (store, selectors) => ({
-    currentUser: selectors.auth.getCurrentUser(store),
-  })
+  componentWillUnMount() {
+    this.listeners.map(un => un());
+  }
 
-  export default withCore(LoginContainer);
+  attemptLogin = (username, password) => {
+    this.props.emit("ATTEMPT_LOGIN", { username, password });
+  };
+
+  render() {
+    return (
+      <div>
+        {this.state.loading && <Spinner> Please wait ... </Spinner>}
+
+        {this.state.error && <Error> {this.state.error.reason} </Error>}
+
+        <LoginForm onSubmit={this.attemptLogin} disabled={this.state.loading} />
+      </div>
+    );
+  }
+}
+
+LoginContainer.stateToProps = (store, selectors) => ({
+  currentUser: selectors.auth.getCurrentUser(store)
+});
+
+export default withFlux(LoginContainer);
 ```
 
 above you will notice few things.
 
 - using listen and emit, makes the UI very clean !
-- this.props.listen return a function that unsubscribe listerner, so we call this function on *unmount* to clear all subscriptions.
+- this.props.listen return a function that unsubscribe listerner, so we call this function on _unmount_ to clear all subscriptions.
 - we will not do any validation in UI, its the SDK job to do it and emit `LOGIN_FAILED` if it fail, this allow for maximum code sharing between project.
 - **RULE OF THUMB:** if its not Enviroment dependent code, try to move it to SDK package.
 
@@ -276,17 +273,14 @@ export default [loadAction];
 selectors.js
 
 ```jsx
-  import * as types from './types';
-  import reducer from './reducer';
+import * as types from "./types";
+import reducer from "./reducer";
 
-  export const getTodos = store => store[types.mountKey] || reducer.initialState;
+export const getTodos = store => store[types.mountKey] || reducer.initialState;
 ```
-
-
 
 ## Todo
 
 - improve HOC function, may be implementing `shouldComponentUpdate` if its proved to be worth it.
 - consider moving logic to its own worker.
 - consider enabling remote Event sourcing keep state tree on remote host !.
-

@@ -1,8 +1,9 @@
 import * as React from "react";
 import t from "prop-types";
 import { subscribe, combineReducers } from "./utils";
+import { INIT_ACTION } from "./types";
 
-const noob = ()=>null;
+const noob = () => null;
 const Context = React.createContext({
   listen: noob,
   emit: noob,
@@ -10,23 +11,24 @@ const Context = React.createContext({
 });
 
 class ReactSimpleFlux extends React.Component {
-
   constructor(props) {
     super(props);
     this.emitter = {};
 
     // adding actions
-    props.actions.map(fn=>subscribe(fn.eventName||'*', fn, this.emitter));
+    props.actions.map(fn => subscribe(fn.eventName || "*", fn, this.emitter));
 
     this.reducer = props.reducer;
 
     this.state = this.reducer(props.initialState || {}, {
-      type: "/simpleflux/@@init/"
+      type: INIT_ACTION
     });
 
-    if(props.debug){
-      console.log('simpleflux/@@init with '+Object.keys(this.emitter).join(',')+' events');
-      console.log('initalState will be =', this.state);
+    if (props.debug) {
+      console.log(
+        INIT_ACTION + " with " + Object.keys(this.emitter).join(",") + " events"
+      );
+      console.log("initalState will be =", this.state);
     }
   }
 
@@ -40,44 +42,57 @@ class ReactSimpleFlux extends React.Component {
    * emit action to be utelized by actionCreator or by UI
    */
   emit = (event, data) => {
+    let actionCreators = [];
 
-      let actionCreators = [];
+    if (Array.isArray(this.emitter["*"])) {
+      actionCreators = this.emitter["*"];
+    }
 
-      if( Array.isArray(this.emitter['*']) ){
-        actionCreators = this.emitter['*'];
-      }
+    if (Array.isArray(this.emitter[event])) {
+      actionCreators = actionCreators.concat(this.emitter[event]);
+    }
 
-      if(Array.isArray(this.emitter[event])){
-        actionCreators = actionCreators.concat(this.emitter[event]);
-      }
+    if (this.props.debug) {
+      console.log("will emit event: " + event);
+      console.log("with data:", data);
+      console.log("to actionCreators:", actionCreators);
+    }
 
-      if(this.props.debug){
-        console.log('will emit event: '+event);
-        console.log('with data:', data);
-        console.log('to actionCreators:', actionCreators);
-      }
+    let promises = actionCreators.map(
+      async fn => await fn(event, data, this.emit, this.getState)
+    );
 
-      let promises = actionCreators.map(async fn => await fn(event, data, this.emit, this.getState) );
-
-      return Promise.all(promises)
-           .then(result=>result.filter(r=>r && typeof r.type==='string') )
-           .then(actions=>actions.reduce((state, action)=>this.reducer(state, action),this.state))
-           .then(newState=>{
-            if(newState && newState !== this.state){
-              if(this.props.debug){
-                console.log('emit event: '+event+' resulted in new state', newState);
-              }
-              this.setState(newState);
-            }
-            if(this.props.debug){
-              console.log('finished working event: '+event, newState);
-            }
-            return newState;
-           })
-           .catch(e=>{
-            console.error('something bad happened while executing event:'+event, data);
-            console.info(promises);
-           })
+    return Promise.all(promises)
+      .then(result => result.filter(r => r && typeof r.type === "string"))
+      .then(actions =>
+        actions.reduce(
+          (state, action) => this.reducer(state, action),
+          this.state
+        )
+      )
+      .then(newState => {
+        if (newState && newState !== this.state) {
+          if (this.props.debug) {
+            console.log(
+              "emit event: " + event + " resulted in new state",
+              newState
+            );
+          }
+          this.setState(newState);
+        }
+        if (this.props.debug) {
+          console.log("finished working event: " + event, newState);
+        }
+        return newState;
+      })
+      .catch(e => {
+        console.error(
+          "something bad happened while executing event:" + event,
+          data
+        );
+        console.info(promises);
+        return this.state;
+      });
   };
 
   /**
@@ -91,9 +106,12 @@ class ReactSimpleFlux extends React.Component {
     // A hook for persisting to storage or whatever
     // @@todo: explore option to remove this and added it as callback to setState to avoid calling this on initalMount !
     // --------------------------------------------
-    this.props.onChange && this.props.onChange(this.state, this.stack);
-    if(this.props.debug){
-      console.log('@@simpleflux: will call onChange because component Did Update !');
+    this.props.onChange && this.props.onChange(this.state);
+    if (this.props.debug) {
+      console.log(
+        "@@simpleflux: will call onChange because component Did Update !",
+        this.state
+      );
     }
   }
 
@@ -125,7 +143,7 @@ ReactSimpleFlux.propTypes = {
 
 const Connect = Context.Consumer;
 
-const withCore = Component => {
+const withFlux = Component => {
   const selectProps = Component.stateToProps;
   return React.forwardRef((props, ref) => {
     const extraProps =
@@ -152,7 +170,7 @@ const withCore = Component => {
 export {
   combineReducers,
   subscribe,
-  withCore,
+  withFlux,
   Connect,
   ReactSimpleFlux as Provider
 };

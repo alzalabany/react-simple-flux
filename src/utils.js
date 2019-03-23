@@ -2,19 +2,15 @@ export function subscribe(name, fn, eventStore) {
   if (Array.isArray(name)) return name.map(n => subscribe(n, fn, eventStore));
 
   if (!eventStore[name]) eventStore[name] = [];
-  if (!eventStore['*']) eventStore['*'] = [];
 
   // mutate eventStore
   eventStore[name].push(fn);
-  eventStore['*'].push(fn);
 
   // return unsubscribe fn;
   const idx = eventStore[name].length - 1;
-  const idx2 = eventStore['*'].length - 1;
   return () => {
     eventStore[name].splice(idx, 1);
-    eventStore['*'].splice(idx2, 1);
-  }
+  };
 }
 export function combineReducers(reducers, debug) {
   const reducerKeys = Object.keys(reducers);
@@ -38,7 +34,8 @@ export function combineReducers(reducers, debug) {
       const scope = reducer.eventName;
 
       if (
-        scope && action.type !== "/simpleflux/@@init/" &&
+        scope &&
+        action.type !== "/simpleflux/@@init/" &&
         (scope !== action.type || scope.indexOf(action.type) === -1)
       ) {
         nextStateForKey = previousStateForKey || initalState;
