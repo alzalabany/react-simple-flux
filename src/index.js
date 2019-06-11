@@ -1,34 +1,61 @@
-import * as React from "react";
-import t from "prop-types";
-import { subscribe, combineReducers } from "./utils";
-import { INIT_ACTION } from "./types";
+import * as React from 'react';
+import { connectViaExtension, extractState } from 'remotedev';
+import t from 'prop-types';
+import { isFunction, subscribe, combineReducers, proxyArgToFns } from './utils';
+import {INIT_ACTION} from './types';
 
+
+const remotedev = connectViaExtension();
 const noob = () => null;
 const Context = React.createContext({
   listen: noob,
   emit: noob,
-  store: {}
+  store: {},
 });
 
 class ReactSimpleFlux extends React.Component {
+  static defaultProps = {
+    actions: [],
+    reducer: () => console.warn('no reducer supplied'),
+  };
+
   constructor(props) {
     super(props);
     this.emitter = {};
 
     // adding actions
-    props.actions.map(fn => subscribe(fn.eventName || "*", fn, this.emitter));
+    if (!props.actions || props.actions.length < 1) { console.warn('no actions supplied'); }
+
+    Array.from(props.actions)
+      .filter(i => !!i)
+      .map(fn => subscribe(fn.eventName || '*', fn, this.emitter));
 
     this.reducer = props.reducer;
 
     this.state = this.reducer(props.initialState || {}, {
-      type: INIT_ACTION
+      type: INIT_ACTION,
     });
 
-    if (props.debug) {
-      console.log(
-        INIT_ACTION + " with " + Object.keys(this.emitter).join(",") + " events"
-      );
-      console.log("initalState will be =", this.state);
+    remotedev.init(this.state, { name: 'iSchool Flux' });
+  }
+
+  componentDidMount() {
+    // Subscribe to change state (if need more than just logging)
+    remotedev.subscribe((message) => {
+      // Helper when only time travelling needed
+      const state = extractState(message);
+      this.setState(state);
+    });
+  }
+
+  componentDidUpdate() {
+    // A hook for persisting to storage or whatever
+    // @@todo: explore option to remove this and added it as callback to setState to avoid calling this on initalMount !
+    // --------------------------------------------
+    const { onChange } = this.props;
+
+    if (isFunction(onChange)) {
+      onChange(this.state);
     }
   }
 
@@ -41,89 +68,63 @@ class ReactSimpleFlux extends React.Component {
   /**
    * emit action to be utelized by actionCreator or by UI
    */
-  emit = (event, data) => {
-    let actionCreators = [];
+   emit = (event, data = {}) => {
+     let actionCreators = [];
 
-    if (Array.isArray(this.emitter["*"])) {
-      actionCreators = this.emitter["*"];
-    }
+     if (Array.isArray(this.emitter['*'])) {
+       actionCreators = this.emitter['*'];
+     }
 
-    if (Array.isArray(this.emitter[event])) {
-      actionCreators = actionCreators.concat(this.emitter[event]);
-    }
+     if (Array.isArray(this.emitter[event])) {
+       actionCreators = actionCreators.concat(this.emitter[event]);
+     }
 
-    if (this.props.debug) {
-      console.log("will emit event: " + event);
-      console.log("with data:", data);
-      console.log("to actionCreators:", actionCreators);
-    }
+     remotedev.send({ type: `@@${event}`, ...data }, this.state);
 
-    let promises = actionCreators.map(
-      async fn => await fn(event, data, this.emit, this.getState)
-    );
+     const promises = actionCreators.map(
+       async fn => await fn(event, data, this.emit, this.getState),
+     );
 
-    return Promise.all(promises)
-      .then(result => result.filter(r => r && typeof r.type === "string"))
-      .then(actions =>
-        actions.reduce(
-          (state, action) => this.reducer(state, action),
-          this.state
-        )
-      )
-      .then(newState => {
-        if (newState && newState !== this.state) {
-          if (this.props.debug) {
-            console.log(
-              "emit event: " + event + " resulted in new state",
-              newState
-            );
-          }
-          this.setState(newState);
-        }
-        if (this.props.debug) {
-          console.log("finished working event: " + event, newState);
-        }
-        return newState;
-      })
-      .catch(e => {
-        console.error(
-          "something bad happened while executing event:" + event,
-          data
-        );
-        console.info(promises);
-        return this.state;
-      });
-  };
+     return new Promise(resolve => Promise.all(promises)
+       .then(result => result.filter(r => r && typeof r.type === 'string'))
+       .then(a => a.reduce((s, aa) => this.reducer(s, aa), this.state))
+       .then((newState) => {
+         // Send changes to the remote monitor
+         remotedev.send({ type: event, ...data }, newState);
+
+         // resolve promise
+         if (newState && newState !== this.state) {
+           this.setState(newState, () => resolve(this.state));
+         } else {
+           return resolve(newState);
+         }
+       })
+       .catch((e) => {
+         console.error(
+           `something bad happened while executing event:${event}`,
+           data,
+         );
+         console.info(promises, e);
+         return resolve(this.state);
+       }));
+   };
 
   /**
    * used by ui to listen to events
    */
-  listen = (eventName, cb) => {
-    return subscribe(eventName, cb, this.emitter);
-  };
+  listen = (eventName, cb) => subscribe(eventName, cb, this.emitter);
 
-  componentDidUpdate() {
-    // A hook for persisting to storage or whatever
-    // @@todo: explore option to remove this and added it as callback to setState to avoid calling this on initalMount !
-    // --------------------------------------------
-    this.props.onChange && this.props.onChange(this.state);
-    if (this.props.debug) {
-      console.log(
-        "@@simpleflux: will call onChange because component Did Update !",
-        this.state
-      );
-    }
-  }
 
   render() {
-    const { emit, listen } = this;
+    const { emit, listen, props } = this;
+
     return (
       <Context.Provider
         value={{
           store: this.state,
           emit,
           listen,
-          selectors: this.props.selectors // just a proxy to avoid import X form '../../../sdk/MODULE/selectors' shit..
+          selectors: props.selectors, // just a proxy to avoid import X form '../../../sdk/MODULE/selectors' shit..
         }}
       >
         {this.props.children}
@@ -132,46 +133,45 @@ class ReactSimpleFlux extends React.Component {
   }
 }
 
-ReactSimpleFlux.displayName = "Core";
+ReactSimpleFlux.displayName = 'Core';
 ReactSimpleFlux.propTypes = {
-  debug: t.boolean,
   reducer: t.func.isRequired,
   actions: t.arrayOf(t.func).isRequired,
+  initalState: t.any,
   onChange: t.func,
-  initalState: t.any
 };
 
 const Connect = Context.Consumer;
 
-const withFlux = Component => {
-  const selectProps = Component.stateToProps;
-  return React.forwardRef((props, ref) => {
-    const extraProps =
-      typeof selectProps === "function"
-        ? selectProps(store, props.selectors)
-        : { store, selectors };
-
+function withFlux(Component) {
+  return function WrapperComponent(props) {
     return (
       <Connect>
-        {data => (
-          <Component
-            {...props}
-            {...extraProps}
-            ref={ref}
-            emit={data.emit}
-            listen={data.listen}
-          />
-        )}
+        {(data) => {
+          const { store } = data;
+          const selectors = proxyArgToFns(data.selectors, data.store);
+          return (
+            <Component
+              {...props}
+              {...(isFunction(Component.stateToProps)
+                ? Component.stateToProps(store, selectors, props)
+                : { store })}
+              selectors={selectors}
+              emit={data.emit}
+              listen={data.listen}
+            />
+          );
+        }}
       </Connect>
     );
-  });
-};
+  };
+}
 
 export {
   combineReducers,
   subscribe,
   withFlux,
   Connect,
-  ReactSimpleFlux as Provider
+  ReactSimpleFlux as Provider,
 };
 export default ReactSimpleFlux;

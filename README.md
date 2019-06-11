@@ -8,7 +8,7 @@ it use React's 16.3 > new Contect Api mix it with Event Subscription model,to fo
 
 just like redux we have
 
-### Action creator
+### Action creator / Interceptor
 
 it create an action (simple object with a type) and send it to the reducer.
 
